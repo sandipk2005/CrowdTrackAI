@@ -1,0 +1,9 @@
+streamlit
+opencv-python-headless
+ultralytics
+deep_sort_realtime
+torch
+torchvision
+numpy
+matplotlib
+
