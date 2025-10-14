@@ -1,4 +1,3 @@
-# main.py
 import streamlit as st
 import cv2
 import numpy as np
@@ -14,29 +13,42 @@ st.title("CrowdTrackAI – Advanced People Counting & Analytics")
 option = st.radio("Select Input", ["Image", "Video", "Live Camera"])
 frames_list = []
 
-# IMAGE
+# ================= IMAGE MODE =================
 if option == "Image":
-    uploaded_file = st.file_uploader("Upload an image", type=["jpg","png"])
+    uploaded_file = st.file_uploader("Upload an image", type=["jpg", "png", "jpeg"])
     if uploaded_file:
         file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
         frame = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+
         detections = detect_people(frame)
-        tracks = update_tracks(detections, frame)
-        frame = draw_tracks(frame, tracks)
-        st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), caption=f"People: {len(tracks)}")
 
-        # Heatmap
-        heatmap = generate_heatmap(tracks, frame.shape)
-        plt.imshow(heatmap, cmap='hot', interpolation='nearest')
-        st.pyplot(plt)
+        # ✅ Safety check before tracking
+        if detections is None or len(detections) == 0:
+            st.error("No people detected! Please upload a clearer image.")
+        else:
+            try:
+                tracks = update_tracks(detections, frame)
+            except Exception as e:
+                st.error(f"Tracking Error: {e}")
+                tracks = []
 
-        alert = overcrowding_alert(len(tracks))
-        if alert:
-            st.warning(alert)
+            frame = draw_tracks(frame, tracks)
+            st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), caption=f"People: {len(tracks)}")
 
-# VIDEO
+            # HEATMAP
+            heatmap = generate_heatmap(tracks, frame.shape)
+            plt.imshow(heatmap, cmap='hot', interpolation='nearest')
+            st.pyplot(plt)
+
+            # ALERT
+            alert = overcrowding_alert(len(tracks))
+            if alert:
+                st.warning(alert)
+
+
+# ================= VIDEO MODE =================
 elif option == "Video":
-    uploaded_file = st.file_uploader("Upload a video", type=["mp4","avi"])
+    uploaded_file = st.file_uploader("Upload a video", type=["mp4", "avi"])
     if uploaded_file:
         tfile = tempfile.NamedTemporaryFile(delete=False)
         tfile.write(uploaded_file.read())
@@ -47,8 +59,18 @@ elif option == "Video":
             ret, frame = cap.read()
             if not ret:
                 break
+
             detections = detect_people(frame)
-            tracks = update_tracks(detections, frame)
+
+            if detections is None or len(detections) == 0:
+                tracks = []
+            else:
+                try:
+                    tracks = update_tracks(detections, frame)
+                except Exception as e:
+                    st.error(f"Tracking Error: {e}")
+                    tracks = []
+
             frame = draw_tracks(frame, tracks)
             frames_list.append(frame)
 
@@ -62,12 +84,14 @@ elif option == "Video":
         save_video(frames_list, VIDEO_OUTPUT)
         st.success(f"Processed video saved: {VIDEO_OUTPUT}")
 
-        # Heatmap for entire video
-        all_tracks = tracker.tracks
-        heatmap = generate_heatmap(all_tracks, frames_list[0].shape)
-        plt.imshow(heatmap, cmap='hot', interpolation='nearest')
-        st.pyplot(plt)
+        # HEATMAP for entire video
+        if frames_list:
+            all_tracks = tracker.tracks
+            heatmap = generate_heatmap(all_tracks, frames_list[0].shape)
+            plt.imshow(heatmap, cmap='hot', interpolation='nearest')
+            st.pyplot(plt)
 
-# LIVE CAMERA
+
+# ================= LIVE CAMERA =================
 elif option == "Live Camera":
-    st.info("Live camera works only locally. Run the app using 'streamlit run main.py'")
+    st.info("Live camera works only locally. Run the app using:  streamlit run main.py")

@@ -1,9 +1,9 @@
 streamlit
-opencv-python-headless
 ultralytics
+opencv-python-headless
 deep_sort_realtime
+numpy
 torch
 torchvision
-numpy
 matplotlib
 
