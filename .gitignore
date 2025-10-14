@@ -1,0 +1,23 @@
+# Ignore virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.dll
+*.so
+*.dylib
+*.lib
+*.log
+*.DS_Store
+.env
+.vscode/
+.idea/
+*.mp4
+*.avi
+*.jpg
+*.jpeg
+*.png
+*.pt
+
