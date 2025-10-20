@@ -92,6 +92,39 @@ elif option == "Video":
             st.pyplot(plt)
 
 
-# ================= LIVE CAMERA =================
+# ================= LIVE CAMERA MODE =================
 elif option == "Live Camera":
-    st.info("Live camera works only locally. Run the app using:  streamlit run main.py")
+    st.info("🎥 Live camera works only when you run Streamlit locally.")
+    st.write("To start, run this command in terminal:")
+    st.code("streamlit run main.py")
+
+    run = st.checkbox("Start Live Camera")
+    FRAME_WINDOW = st.image([])
+    cap = cv2.VideoCapture(0)
+
+    while run:
+        ret, frame = cap.read()
+        if not ret:
+            st.error("❌ Unable to access webcam.")
+            break
+
+        detections = detect_people(frame)
+
+        if detections is None or len(detections) == 0:
+            tracks = []
+        else:
+            try:
+                tracks = update_tracks(detections, frame)
+            except Exception as e:
+                st.error(f"Tracking Error: {e}")
+                tracks = []
+
+        frame = draw_tracks(frame, tracks)
+        FRAME_WINDOW.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), channels="RGB")
+
+        alert = overcrowding_alert(len(tracks))
+        if alert:
+            st.warning(alert)
+
+    cap.release()
+    st.success("✅ Camera stopped.")
