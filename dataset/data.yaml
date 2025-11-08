@@ -1,0 +1,5 @@
+train: C:\Users\userp\OneDrive\Desktop\CrowdTrackAI\dataset\images\train
+val: C:\Users\userp\OneDrive\Desktop\CrowdTrackAI\dataset\images\val
+
+nc: 1
+names: ['person']
