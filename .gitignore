@@ -1,5 +1,0 @@
-# Ignore virtual environment
-venv/
-venv/*  
-
-# If you have other large files or directories, add them here

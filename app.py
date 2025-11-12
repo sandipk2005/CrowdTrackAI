@@ -2,18 +2,33 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-from detection import detect_people
-from tracking import update_tracks, tracker
+from detection import detect_people, load_yolo_model
 from utils import draw_tracks, generate_heatmap, overcrowding_alert, save_video
-from config import MAX_PEOPLE
+from config import (
+    MAX_PEOPLE,
+    YOLO_MODELS,
+    ENABLE_FPS_DISPLAY,
+    ENABLE_DENSITY_METER,
+    ENABLE_HEATMAP,
+    ENABLE_OVERCROWD_ALERT,
+    ALERT_SOUND
+)
 import tempfile
 import time
+import os
+import csv
+from datetime import datetime
+import plotly.graph_objects as go
+import pandas as pd
 
+# ✅ Optimize OpenCV performance
+cv2.setUseOptimized(True)
+cv2.setNumThreads(4)
 
-# 🌐 Streamlit Page Config
+# 🌐 Streamlit App Config
 st.set_page_config(page_title="CrowdTrackAI – Smart Detection", page_icon="🤖", layout="wide")
 
-# 💠 --- CUSTOM AI STYLE ---
+# 💠 --- Custom Cyber Style ---
 st.markdown("""
 <style>
 .stApp {
@@ -56,79 +71,92 @@ div.stButton > button:hover {
 </style>
 """, unsafe_allow_html=True)
 
-# 🔷 AI Header
+# 🔷 Header
 st.markdown("""
 <h1>🤖 CrowdTrackAI</h1>
 <h3>AI-Powered Real-Time People Detection System</h3>
 <div class="scan-line"></div>
 """, unsafe_allow_html=True)
 
-# 🧩 Mode Selection
-option = st.radio("Select Input Source:", ["🖼️ Image", "🎥 Video", "📷 Live Camera"], horizontal=True)
+# Sidebar model selector
+st.sidebar.header("⚙️ YOLO Model Settings")
+model_choice = st.sidebar.selectbox(
+    "Select YOLO Model",
+    options=list(YOLO_MODELS.keys()),
+    index=0,
+    help="⚡ Speed Mode (yolov8n) or 🎯 Accuracy Mode (yolov8l)"
+)
+load_yolo_model(model_choice)
 
-# 🟢 AI Status
+# Mode selector
+option = st.radio("Select Input Source:", ["🖼️ Image", "🎥 Video", "📷 Live Camera", "📊 Data Insights"], horizontal=True)
+
+# AI Status
 st.markdown('<div style="text-align:center;"><span>🧠 AI Status: </span><span class="ai-active">ACTIVE 🔵</span></div>', unsafe_allow_html=True)
 st.markdown("<hr>", unsafe_allow_html=True)
 
-# Live Counter Placeholder
 count_placeholder = st.empty()
+chart_placeholder = st.empty()
 
-# ---------------- IMAGE MODE -----------------
+# Logging setup
+LOG_DIR = "logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, "detections_log.csv")
+if not os.path.exists(LOG_FILE):
+    with open(LOG_FILE, mode='w', newline='') as f:
+        csv.writer(f).writerow(["Timestamp", "People_Count", "Confidence(%)", "Mode"])
+
+def log_detection(people_count, avg_conf, mode):
+    with open(LOG_FILE, mode='a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), people_count, avg_conf, mode])
+
+# ------------------------------------------------ IMAGE MODE ------------------------------------------------
 if option == "🖼️ Image":
-    uploaded_file = st.file_uploader("Upload Image", type=["jpg","jpeg","png"])
+    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "jpeg", "png"])
     if uploaded_file:
         image = Image.open(uploaded_file)
         frame = np.array(image)
-        detections = detect_people(frame)
-        count_placeholder.markdown(f"<h2 style='text-align:center;color:#00ffaa;'>🧍 People Detected: {len(detections)}</h2>", unsafe_allow_html=True)
-        tracks = [(i, [x,y,x+w,y+h], "person") for i, ([x,y,w,h],_,_) in enumerate(detections)]
-        frame = draw_tracks(frame, tracks)
-        st.image(frame, channels="BGR", caption=f"Detected: {len(detections)}")
+        start_time = time.time()
 
+        detections, people_count, avg_conf = detect_people(frame)
+        fps = 1.0 / (time.time() - start_time)
+        log_detection(people_count, avg_conf, "Image")
 
-# ---------------- VIDEO MODE -----------------
+        count_placeholder.markdown(f"<h2 style='text-align:center;color:#00ffaa;'>🧍 People Detected: {people_count}</h2>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='text-align:center;color:#00ffff;'>Detection Accuracy: {avg_conf}%</h4>", unsafe_allow_html=True)
+
+        for det in detections:
+            bbox = det[0]
+            if len(bbox) == 4:
+                x, y, w, h = map(int, bbox)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.putText(frame, "Person", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+        if ENABLE_HEATMAP:
+            heatmap = generate_heatmap(frame, detections)
+            frame = cv2.addWeighted(frame, 0.7, heatmap, 0.3, 0)
+
+        if ENABLE_FPS_DISPLAY:
+            cv2.putText(frame, f"FPS: {fps:.1f}", (20, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+
+        if ENABLE_OVERCROWD_ALERT and people_count > MAX_PEOPLE:
+            st.warning("🚨 Overcrowding Alert! Area exceeds safe limit.")
+            if os.path.exists(ALERT_SOUND):
+                st.audio(ALERT_SOUND, format="audio/mp3", start_time=0)
+
+        st.image(frame, channels="BGR", caption=f"Detected: {people_count}")
+
+# ------------------------------------------------ VIDEO MODE ------------------------------------------------
 elif option == "🎥 Video":
-    import tempfile
-    import numpy as np
-    import cv2
-    import streamlit as st
-    from ultralytics import YOLO
-
-    # Load YOLO model
-    model = YOLO("yolov8n.pt")
-
-    # Function to detect people
-    def detect_people(frame):
-        results = model(frame)
-        detections = []
-        for r in results:
-            for box in r.boxes:
-                if int(box.cls[0]) == 0:  # class 0 = person
-                    detections.append(box.xyxy[0].tolist())
-        return detections
-
-    # Save processed video
-    def save_video(frames, output_path):
-        if not frames:
-            return
-        height, width, _ = frames[0].shape
-        out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), 20, (width, height))
-        for frame in frames:
-            out.write(frame)
-        out.release()
-
-    # Upload video
     video_file = st.file_uploader("📹 Upload Video", type=["mp4", "avi", "mov"])
     if video_file:
         temp_video = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
         temp_video.write(video_file.read())
         temp_video.close()
-
         cap = cv2.VideoCapture(temp_video.name)
-
-        # Streamlit placeholders
-        stframe = st.empty()             # for showing video frames
-        count_placeholder = st.empty()   # for real-time count text
+        stframe = st.image([])
         frames = []
 
         with st.spinner("🧠 AI analyzing video..."):
@@ -137,95 +165,148 @@ elif option == "🎥 Video":
                 if not ret:
                     break
 
-                # Detection
-                detections = detect_people(frame)
-                valid_boxes = []
+                start_time = time.time()
+                detections, people_count, avg_conf = detect_people(frame)
+                fps = 1.0 / (time.time() - start_time)
+                log_detection(people_count, avg_conf, "Video")
 
                 for det in detections:
-                    try:
-                        x1, y1, x2, y2 = map(int, np.array(det[:4]).flatten())
-                        valid_boxes.append((x1, y1, x2, y2))
-                    except Exception as e:
-                        print("⚠️ Detection error:", e)
+                    bbox = det[0]
+                    if len(bbox) == 4:
+                        x, y, w, h = map(int, bbox)
+                        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                        cv2.putText(frame, "Person", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-                # Draw boxes
-                for (x1, y1, x2, y2) in valid_boxes:
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(frame, "Person", (x1, y1 - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                if ENABLE_FPS_DISPLAY:
+                    cv2.putText(frame, f"FPS: {fps:.1f}", (20, 40),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
-                # Count
-                total_people = len(valid_boxes)
-
-                # ✅ Styled real-time display
-                count_placeholder.markdown(
-                    f"""
-                    <div style='text-align:center; margin-top:15px;'>
-                        <h2 style='color:#00ffaa; font-size:28px; text-shadow:0 0 15px #00ffaa;'>
-                            🧍 People Detected: {total_people}
-                        </h2>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-                # Show video frame
-                stframe.image(frame, channels="BGR", use_container_width=True)
+                count_placeholder.markdown(f"<h2 style='text-align:center;color:#00ffaa;'>🧍 People Detected: {people_count}</h2>", unsafe_allow_html=True)
+                st.markdown(f"<h4 style='text-align:center;color:#00ffff;'>Detection Accuracy: {avg_conf}%</h4>", unsafe_allow_html=True)
+                stframe.image(frame, channels="BGR", width="stretch")
                 frames.append(frame)
 
             cap.release()
             save_video(frames, "output/output_video.mp4")
-
         st.success("✅ Video processed successfully!")
         st.video("output/output_video.mp4")
 
-
-# ---------------- LIVE CAMERA -----------------
+# ------------------------------------------------ LIVE CAMERA MODE ------------------------------------------------
 elif option == "📷 Live Camera":
-    st.warning("🎥 Live Camera Mode – Press 'Stop' to end streaming.")
-    run = st.checkbox("Start Camera")
-    FRAME_WINDOW = st.image([])
-    cap = cv2.VideoCapture(0)
+    st.markdown("### 🎥 Choose your camera source:")
+    camera_type = st.radio(
+        "Select Camera Type:",
+        ["💻 Laptop/PC Camera", "📱 Android Camera (IP Webcam)"],
+        horizontal=True
+    )
 
-    while run:
-        ret, frame = cap.read()
-        if not ret:
-            st.error("❌ Unable to access camera")
-            break
+    run = st.checkbox("✅ Start Camera Stream")
 
-        detections = detect_people(frame)
-        if detections is None or len(detections) == 0:
-            tracks = []
+    # Initialize camera safely
+    cap = None
+    if camera_type == "💻 Laptop/PC Camera":
+        # Try all Windows-compatible backends automatically
+        for backend in [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_VFW]:
+            temp_cap = cv2.VideoCapture(0, backend)
+            if temp_cap.isOpened():
+                cap = temp_cap
+                st.success(f"✅ Camera initialized using backend: {backend}")
+                break
+        if not cap or not cap.isOpened():
+            st.error("❌ Could not access webcam. Try closing other camera apps or restarting your PC.")
+    else:
+        ip_url = st.text_input("📱 Enter Android camera stream URL (e.g. http://192.168.1.5:8080/video):")
+        if ip_url.strip():
+            cap = cv2.VideoCapture(ip_url)
+            st.info("📶 Connected to Android IP camera stream.")
         else:
-            tracks = update_tracks(detections, frame)
+            st.warning("Please enter your Android camera URL to start the feed.")
+            cap = None
 
-        # ✅ FIXED: draw bounding boxes safely
+    # Configure capture properties for smooth performance
+    if cap and cap.isOpened():
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FPS, 30)
+
+    FRAME_WINDOW = st.image([])
+
+    while run and cap and cap.isOpened():
+        ret, frame = cap.read()
+        if not ret or frame is None:
+            st.error("⚠️ Frame not received. Check camera connection.")
+            time.sleep(0.5)
+            continue
+
+        # YOLOv8 detection
+        start_time = time.time()
+        detections, people_count, avg_conf = detect_people(frame)
+        fps = 1.0 / (time.time() - start_time)
+        log_detection(people_count, avg_conf, "Live Camera")
+
+        # Draw detections
         for det in detections:
-            if isinstance(det[0], (list, tuple, np.ndarray)):
-                det = det[0]
-            x, y, w, h = [int(v) for v in det[:4]]
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.putText(frame, "Person", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            bbox = det[0]
+            if len(bbox) == 4:
+                x, y, w, h = map(int, bbox)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.putText(frame, "Person", (x, y - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
-        frame = draw_tracks(frame, tracks)
+        # Show FPS
+        if ENABLE_FPS_DISPLAY:
+            cv2.putText(frame, f"FPS: {fps:.1f}", (20, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
+        FRAME_WINDOW.image(frame, channels="BGR", width="stretch")
         count_placeholder.markdown(
-            f"<h2 style='text-align:center;color:#00ffaa;'>🧍 People Detected: {len(detections)}</h2>",
-            unsafe_allow_html=True,
+            f"<h2 style='text-align:center;color:#00ffaa;'>🧍 People Detected: {people_count}</h2>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            f"<h4 style='text-align:center;color:#00ffff;'>Detection Accuracy: {avg_conf}%</h4>",
+            unsafe_allow_html=True
         )
 
-        FRAME_WINDOW.image(frame, channels="BGR")
         time.sleep(0.02)
 
-    else:
+    # Safe release
+    if cap:
         cap.release()
-        st.info("🛑 Camera stopped.")
+    st.info("🛑 Stream stopped.")
 
 
+# ------------------------------------------------ INSIGHTS DASHBOARD ------------------------------------------------
+elif option == "📊 Data Insights":
+    st.markdown("## 📈 Detection Insights Dashboard")
 
-# Footer
+    if not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0:
+        st.warning("⚠️ No log data found. Run detections first.")
+    else:
+        df = pd.read_csv(LOG_FILE)
+        total_frames = len(df)
+        total_people = df["People_Count"].sum()
+        max_crowd = df["People_Count"].max()
+        avg_conf = round(df["Confidence(%)"].mean(), 2)
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("🧍 Total People", f"{total_people}")
+        col2.metric("📸 Frames", f"{total_frames}")
+        col3.metric("👥 Max Crowd", f"{max_crowd}")
+        col4.metric("🎯 Avg. Confidence", f"{avg_conf}%")
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(y=df["People_Count"], mode="lines+markers", name="People Count", line=dict(color="lime", width=3)))
+        fig.add_trace(go.Scatter(y=df["Confidence(%)"], mode="lines+markers", name="Confidence (%)", line=dict(color="cyan", width=2, dash="dot")))
+        fig.update_layout(title="🧠 Detection Trends", xaxis_title="Frame Index", yaxis_title="Value", template="plotly_dark", height=400)
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.dataframe(df.tail(20), use_container_width=True)
+        csv_data = df.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Export Full Log as CSV", data=csv_data, file_name="CrowdTrackAI_Log.csv", mime="text/csv")
+
+# ------------------------------------------------ Footer ------------------------------------------------
 st.markdown("""
 <hr>
 <h5 style='text-align:center;color:#00ffff;'>Made with 🧠 by VisAI Labs | Powered by YOLOv8 + Streamlit</h5>
 """, unsafe_allow_html=True)
-
