@@ -1,23 +1,45 @@
-# config.py — CrowdTrackAI Configuration
+"""
+CrowdTrackAI – Central Configuration File
+------------------------------------------
+This file stores all important settings such as model paths, feature toggles,
+alert parameters, and default folder locations.
 
-# ✅ YOLO model paths
+Modify these values as per your project needs.
+"""
+
+# -----------------------------------------------------------
+#  YOLO Model Options
+# -----------------------------------------------------------
+
 YOLO_MODELS = {
-    "small": "yolov8n.pt",   # ⚡ Fast (Speed Mode)
-    "large": "yolov8l.pt"    # 🎯 Accurate (Accuracy Mode)
+    "small": "yolov8n.pt",   # ⚡ Fast inference (recommended for CPU / Streamlit Cloud)
+    "large": "yolov8l.pt"    # 🎯 High accuracy (use only on GPU machines)
 }
 
-# 🚷 Safety limits
-MAX_PEOPLE = 5000  # crowd threshold before alert 
+# -----------------------------------------------------------
+#  Alert / Safety Settings
+# -----------------------------------------------------------
 
-# ⚙️ Feature Toggles
-ENABLE_FPS_DISPLAY = True
-ENABLE_DENSITY_METER = True
-ENABLE_HEATMAP = False
-ENABLE_OVERCROWD_ALERT = True
+MAX_PEOPLE = 5000         # 🚷 Threshold for overcrowding alert
 
-# 🔊 Alert sound
-ALERT_SOUND = "alert.mp3"  # Make sure alert.mp3 is placed in project root
+# Path to alert sound (place alert.mp3 in root directory)
+ALERT_SOUND = "alert.mp3"
 
-# 📦 Default paths
-DEFAULT_OUTPUT_DIR = "output"
-DEFAULT_LOG_DIR = "logs"
+
+# -----------------------------------------------------------
+#  Feature Toggles (Enable / Disable)
+# -----------------------------------------------------------
+
+ENABLE_FPS_DISPLAY = True        # Show real-time FPS
+ENABLE_DENSITY_METER = True      # Show crowd density indicator
+ENABLE_HEATMAP = False           # Show live heatmap (CPU heavy)
+ENABLE_OVERCROWD_ALERT = True    # Enable audio / visual alerts
+
+
+# -----------------------------------------------------------
+#  Default Paths
+# -----------------------------------------------------------
+
+DEFAULT_OUTPUT_DIR = "output"    # Folder to save results (videos, images)
+DEFAULT_LOG_DIR = "logs"         # Folder to save logs
+
