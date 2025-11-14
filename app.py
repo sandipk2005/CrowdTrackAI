@@ -84,7 +84,7 @@ model_choice = st.sidebar.selectbox(
     "Select YOLO Model",
     options=list(YOLO_MODELS.keys()),
     index=0,
-    help="⚡ Speed Mode (yolov8n) or 🎯 Accuracy Mode (yolov8l)"
+    help="⚡ Speed Mode (yolov8n) or 🟠 Balanced Mode (yolov8m) or 🎯 Accuracy Mode (yolov8l)"
 )
 load_yolo_model(model_choice)
 
