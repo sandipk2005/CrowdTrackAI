@@ -1,12 +1,24 @@
+# config.py
 # ✅ YOLO model paths
 YOLO_MODELS = {
-    "small": "yolov8n.pt",    # ⚡ Fast (Speed Mode)
-    "medium": "yolov8m.pt",   # 🟠 Medium (Balanced Mode)
-    "large": "yolov8l.pt"     # 🎯 Accurate (Accuracy Mode)
+    "yolov8n": "yolov8n.pt",
+    "yolov8s": "yolov8s.pt", 
+    "yolov8m": "yolov8m.pt",
+    "yolov8l": "yolov8l.pt",
+    "yolov8x": "yolov8x.pt",
+    "pose_small": "models/yolov8s-pose.pt",
+    "pose_large": "models/yolov8x-pose.pt"
 }
 
+
 # 🚷 Safety limits
-MAX_PEOPLE = 5000  # crowd threshold before alert 
+MAX_PEOPLE = 5000  # legacy/fallback crowd threshold before alert
+
+# 👇 New: default range slider values (min, max)
+RANGE_DEFAULTS = {
+    "min": 10,
+    "max": 1000
+}
 
 # ⚙️ Feature Toggles
 ENABLE_FPS_DISPLAY = True
