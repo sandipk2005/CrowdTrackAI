@@ -52,7 +52,7 @@ It uses **YOLOv8 + Streamlit** to detect, count, and monitor people in live feed
 
 ## ⚙️ **Quick Setup**
 
-```bash
+
 # 1️⃣ Clone Repository
 git clone https://github.com/sandipk2005/CrowdTrackAI.git
 cd CrowdTrackAI
@@ -107,7 +107,10 @@ streamlit run app.py
 
 ## 👨‍💻 **Developer**
 
-**Sandip A. Khamkar**  
+**Sandip A. Khamkar**
+
+**🎓 BSC.Data Science**
+
 Department of Technology, Savitribai Phule Pune University  
 📧 **sandipkhamkar564@gmail.com**
 
