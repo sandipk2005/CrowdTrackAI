@@ -93,11 +93,9 @@ It uses **YOLOv8 + Streamlit** to detect, count, and monitor people in live feed
 
 ---
 
-## 👨‍💻 **Developer**
+## 👨‍💻 **Author**
 
-**Sandip A. Khamkar**
-
-**🎓 BSC.Data Science**
+**Sandip Khamkar**
 
 Department of Technology, Savitribai Phule Pune University  
 📧 **sandipkhamkar564@gmail.com**
@@ -106,5 +104,8 @@ Department of Technology, Savitribai Phule Pune University
 
 ## 🪪 **License**
 
-MIT License © 2025 — Free for research & innovation.  
+MIT License
+
+This project is open-source and Free for academic & research purposes with proper attribution.
+
 **Empowering Safety Through Artificial Intelligence.**
