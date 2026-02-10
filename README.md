@@ -50,23 +50,11 @@ It uses **YOLOv8 + Streamlit** to detect, count, and monitor people in live feed
 
 ---
 
-## ⚙️ **Quick Setup**
-
-
-# 1️⃣ Clone Repository
-git clone https://github.com/sandipk2005/CrowdTrackAI.git
-cd CrowdTrackAI
-
-# 2️⃣ Install Dependencies (CUDA 12.1 supported)
-pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu121
-
-# 3️⃣ Run Application
-streamlit run app.py
 ## 📱 **Use on Android (IP Webcam)**
 
 1. Install **IP Webcam** from Google Play Store  
 2. Tap **Start Server**  
-3. Copy the stream URL (example: `http://192.168.1.8:8080/video`)  
+3. Copy the stream URL ([https://crowdtrackai-cby2qerx58lzv2ghkrccrf.streamlit.app/])  
 4. In **CrowdTrackAI** → choose **📷 Live Camera → Android IP Webcam**  
 5. Paste the URL → ✔ **Start Detection**
 
